@@ -13,7 +13,9 @@ fn main() {
         .add_plugin(InteractablePickingPlugin)
         .add_plugin(WorldInspectorPlugin::new())
         .add_system(clicky.in_base_set(CoreSet::PostUpdate))
+        .add_system(clicky_bar.in_base_set(CoreSet::PostUpdate))
         .add_startup_system(setup)
+        .add_startup_system(loading_bar)
         .run();
 }
 
@@ -67,32 +69,56 @@ fn setup(
         .id();
     commands.entity(parent).push_children(&[chest]);
 }
+#[derive(Component, Default, Copy, Clone)]
+pub struct Bar {
+    per: f32,
+}
 
-pub fn print_events(
-    mut events: EventReader<PickingEvent>,
-    mut query: Query<&mut Handle<ColorMaterial>>,
+#[derive(Component, Default, Copy, Clone)]
+pub struct ProgBar {
+    per: f32,
+}
+pub fn loading_bar(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    primary_query: Query<&Window, With<PrimaryWindow>>,
+    mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-    for event in events.iter() {
-        match event {
-            PickingEvent::Selection(e) => {
-                // if let SelectionEvent::JustSelected(e) = e {
-                //     if let Ok(x) = query.get_mut(*e) {
-                //         let  y = materials.get_mut(&x).unwrap();
-                //         y.color.set_r(y.color.r() - 0.10);
-                //        // *x =  materials.add(ColorMaterial::from(*y));
-                //   }
-                // }
-            }
-            PickingEvent::Hover(e) => info!("Egads! A hover event!? {:?}", e),
-            PickingEvent::Clicked(e) => {}
-        }
-    }
+    let parent = commands
+        .spawn(MaterialMesh2dBundle {
+            mesh: meshes
+                .add(shape::Quad::new(Vec2::new(50., 100.)).into())
+                .into(),
+            material: materials.add(ColorMaterial::from(Color::RED)),
+            transform: Transform::from_translation(Vec3::new(0., -200., 20.))
+                .with_scale(Vec3::new(2.6, 1.5, 1.0)),
+            ..default()
+        })
+        .insert(Bar { per: 0.0 })
+        .insert(PickableBundle::default())
+        .id();
+    let per = 0.0;
+    let prog = (1.0 - per) * -50.0;
+    let butt = commands
+        .spawn(MaterialMesh2dBundle {
+            mesh: meshes
+                .add(shape::Quad::new(Vec2::new(50., 100.)).into())
+                .into(),
+            material: materials.add(ColorMaterial::from(Color::BLUE)),
+            transform: Transform::from_translation(Vec3::new(0., prog, 1.))
+                .with_scale(Vec3::new(1.0, per, 1.0)),
+            ..default()
+        })
+        .insert(ProgBar { per: 0.0 })
+        .id();
+    commands.entity(parent).push_children(&[butt]);
 }
+
 pub fn clicky(
     mouse_button_input: Res<Input<MouseButton>>,
     touches_input: Res<Touches>,
-    click_query: Query<(Entity, &Hover)>,
+    click_query: Query<(Entity, &Hover), Without<Bar>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
     mut query: Query<&mut Handle<ColorMaterial>>,
 ) {
@@ -104,7 +130,6 @@ pub fn clicky(
                 if let Ok(x) = query.get_mut(entity) {
                     let y = materials.get_mut(&x).unwrap();
                     y.color.set_r(y.color.r() - 0.10);
-                    // *x =  materials.add(ColorMaterial::from(*y));
                 }
             }
         }
@@ -117,7 +142,46 @@ pub fn clicky(
                 if let Ok(x) = query.get_mut(entity) {
                     let y = materials.get_mut(&x).unwrap();
                     y.color.set_r(y.color.r() + 0.10);
-                    // *x =  materials.add(ColorMaterial::from(*y));
+                }
+            }
+        }
+    }
+}
+
+pub fn clicky_bar(
+    mouse_button_input: Res<Input<MouseButton>>,
+    touches_input: Res<Touches>,
+    mut click_query: Query<(Entity, &mut Transform, &mut Bar, &Hover)>,
+    mut query: Query<(Entity, &mut Transform, &mut ProgBar), Without<Bar>>,
+) {
+    if mouse_button_input.just_pressed(MouseButton::Left)
+        || touches_input.iter_just_pressed().next().is_some()
+    {
+        for (entity, mut transform, mut bar, hover) in click_query.iter_mut() {
+            if hover.hovered() {
+                bar.per += 0.1;
+                print!("{}", bar.per);
+                let per = bar.per;
+                let prog = (1.0 - per) * -50.0;
+                for (entity, mut t, p) in query.iter_mut() {
+                    *t = Transform::from_translation(Vec3::new(0., prog, 1.))
+                        .with_scale(Vec3::new(1.0, per, 1.0));
+                }
+            }
+        }
+    }
+    if mouse_button_input.just_pressed(MouseButton::Right)
+        || touches_input.iter_just_pressed().next().is_some()
+    {
+        for (entity, mut transform, mut bar, hover) in click_query.iter_mut() {
+            if hover.hovered() {
+                bar.per -= 0.1;
+                print!("{}", bar.per);
+                let per = bar.per;
+                let prog = (1.0 - per) * -50.0;
+                for (entity, mut t, p) in query.iter_mut() {
+                    *t = Transform::from_translation(Vec3::new(0., prog, 1.))
+                        .with_scale(Vec3::new(1.0, per, 1.0));
                 }
             }
         }
