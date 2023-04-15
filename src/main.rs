@@ -160,7 +160,6 @@ pub fn clicky_bar(
         for (entity, mut transform, mut bar, hover) in click_query.iter_mut() {
             if hover.hovered() {
                 bar.per += 0.1;
-                print!("{}", bar.per);
                 let per = bar.per;
                 let prog = (1.0 - per) * -50.0;
                 for (entity, mut t, p) in query.iter_mut() {
@@ -176,7 +175,6 @@ pub fn clicky_bar(
         for (entity, mut transform, mut bar, hover) in click_query.iter_mut() {
             if hover.hovered() {
                 bar.per -= 0.1;
-                print!("{}", bar.per);
                 let per = bar.per;
                 let prog = (1.0 - per) * -50.0;
                 for (entity, mut t, p) in query.iter_mut() {
